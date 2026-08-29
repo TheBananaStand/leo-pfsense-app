@@ -18,16 +18,7 @@ axum = { version = "0.8", features = ["ws", "multipart"] }
 # rt-multi-thread for the server, macros for #[tokio::main], time for the
 # bandwidth sampler tick, process is unused here but kept to match the
 # workspace pin in case a caller inspects the feature set.
-tokio = { version = "1", features = [
-    "rt-multi-thread",
-    "macros",
-    "time",
-    "process",
-    "sync",
-    "fs",
-    "net",
-    "io-util",
-] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "process", "sync", "fs", "net", "io-util", "io-std"] }
 
 # Serialization
 serde = { version = "1", features = ["derive"] }

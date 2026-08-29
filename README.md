@@ -5,12 +5,43 @@ reverse-proxies at `/p/pfsense/*`. It is the pfSense network management
 backend, extracted from the compiled `leo-pfsense` package into a subprocess
 that the hub can run without recompiling itself.
 
-## What it does
+## Subcommands
+
+```
+leo-pfsense-app start   # HTTP server (default when no argument is given)
+leo-pfsense-app mcp     # MCP stdio server
+```
+
+Both modes read the same env vars — one binary, two personalities.
+
+### HTTP mode (`start` or no argument)
 
 - Connects to pfSense over SSH (key-based or password auth)
 - Serves the Network page descriptor and live data at `/leo/ui/*`
 - Mirrors the hub's `/api/network/*` REST surface at the same relative paths
 - Runs a background sampler that measures WAN/LAN throughput every 10s
+
+### MCP mode (`mcp`)
+
+Speaks the [Model Context Protocol](https://modelcontextprotocol.io) over
+stdio: newline-delimited JSON-RPC 2.0 on stdin, responses on stdout. The host
+(Claude, LeoCode, or any MCP-aware client) registers this binary as an MCP
+server and calls its two tools:
+
+| Tool | Actions |
+|---|---|
+| `network` | `get_dashboard`, `get_devices`, `get_dhcp_leases`, `get_dhcp_static_mappings`, `add_dhcp_static_mapping`, `delete_dhcp_static_mapping`, `get_dns_overrides`, `add_dns_override`, `delete_dns_override`, `get_vpn_status`, `get_wan_info`, `get_lan_info`, `get_haproxy_config` |
+| `pfsense_ssh` | `ssh_command`, `php_exec`, `read_config` |
+
+The tool schemas are reproduced verbatim from `packages/leo-network` and
+`packages/leo-pfsense` so the MCP surface and the compiled-package surface
+stay in sync.
+
+**Why one binary, not a separate MCP package:** when the hub launches an MCP
+subprocess it injects entitled settings as env vars — but it does not inject
+the app's hub-assigned port. A separate binary could not discover the HTTP
+server to proxy through it. Sharing the binary gives MCP mode direct access to
+`PfSenseService` with no HTTP hop and no port discovery.
 
 ## Environment variables
 

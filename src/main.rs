@@ -4,6 +4,14 @@
 //! The hub mounts this at `/p/pfsense/*`, stripping the prefix before forwarding.
 //! Auth is delegated: the hub injects `X-Leo-User-Id` and `x-leo-is-admin` on
 //! every request; this binary trusts those headers and never holds a session store.
+//!
+//! ## Subcommands
+//!
+//! `leo-pfsense-app mcp`   — speak MCP over stdio instead of serving HTTP
+//! `leo-pfsense-app start` — HTTP server (the default when no arg is given)
+//!
+//! Both modes read settings from the same env vars. The reason they share one
+//! binary is explained in `mcp.rs`.
 
 use std::sync::Arc;
 
@@ -14,6 +22,7 @@ mod auth;
 mod bandwidth;
 mod config;
 mod error;
+mod mcp;
 mod pfsense;
 mod routes;
 mod sampler;
@@ -49,9 +58,10 @@ pub fn build_router(state: AppState) -> Router {
 
 #[tokio::main]
 async fn main() {
-    // Respect RUST_LOG; default to info so the operator can see SSH activity
-    // without drowning in debug output.
+    // Logs go to stderr in both modes — in MCP mode the host reads stdout as
+    // protocol; mixing logs there would corrupt the stream.
     tracing_subscriber::fmt()
+        .with_writer(std::io::stderr)
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
                 .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
@@ -68,6 +78,27 @@ async fn main() {
         cfg.pfsense_key.clone(),
     ));
 
+    // Dispatch on the first argument. "mcp" runs the MCP stdio loop; anything
+    // else (including no argument) runs the HTTP server as before.
+    //
+    // The reason MCP mode lives in this binary rather than a separate package:
+    // the hub injects entitled settings as env vars when launching an MCP
+    // subprocess, but those vars do not include the app's hub-assigned port.
+    // A separate binary could not discover the HTTP server to call it. Sharing
+    // the binary gives MCP mode direct access to PfSenseService — no HTTP hop,
+    // no port discovery needed. See src/mcp.rs for the protocol details.
+    match std::env::args().nth(1).as_deref() {
+        Some("mcp") => {
+            eprintln!("leo-pfsense-app: MCP stdio mode");
+            mcp::run(pf).await;
+        }
+        _ => {
+            run_http_server(pf, cfg).await;
+        }
+    }
+}
+
+async fn run_http_server(pf: Arc<pfsense::PfSenseService>, cfg: config::Config) {
     let monitor = Arc::new(bandwidth::BandwidthMonitor::new());
 
     // Spawn the background sampler — it runs forever, feeding the monitor.
