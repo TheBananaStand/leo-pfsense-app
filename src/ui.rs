@@ -71,19 +71,27 @@ pub async fn descriptor_handler(
     Json(json!({ "network": network_page() }))
 }
 
+/// The one page this package serves, and what an unspecified page resolves to.
+const DEFAULT_PAGE: &str = "network";
+
 /// `GET /leo/ui/data?page=network` — live bind data for the Network page.
+///
+/// An absent `page` means the only page there is. The hub forwards the
+/// *client's* query params rather than supplying the page itself — that half is
+/// only true for compiled packages, whose `ui_data` is handed `{"page": …}` —
+/// so a caller omitting it is ordinary rather than broken. Answering a
+/// one-page package with "page '' has no data" turns the package's own
+/// pedantry into a 502 and blames the caller for it.
 pub async fn data_handler(
     _caller: Caller,
     State(state): State<AppState>,
     Query(params): Query<DataQuery>,
 ) -> Result<Json<Value>, Error> {
-    let page = params.page.as_deref().unwrap_or("");
-    match page {
-        "network" => {
-            let data = network_data(&state.pfsense).await?;
-            Ok(Json(data))
-        }
-        other => Err(Error::Other(format!("pfsense ui page '{other}' has no data"))),
+    match params.page.as_deref().unwrap_or(DEFAULT_PAGE) {
+        "" | DEFAULT_PAGE => Ok(Json(network_data(&state.pfsense).await?)),
+        other => Err(Error::Other(format!(
+            "pfsense has no page '{other}' — this package serves only '{DEFAULT_PAGE}'"
+        ))),
     }
 }
 
