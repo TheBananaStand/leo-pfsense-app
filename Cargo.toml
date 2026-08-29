@@ -1,0 +1,58 @@
+[package]
+name = "leo-pfsense-app"
+version = "0.1.0"
+# Edition 2024 is used by the Leo workspace, and let-chains (&& let Some) used
+# in pfsense.rs and bandwidth.rs were stabilized in Rust 1.88 (edition-agnostic)
+# but this keeps the binary's Rust edition aligned with the code it was ported from.
+edition = "2024"
+
+[[bin]]
+name = "leo-pfsense-app"
+path = "src/main.rs"
+
+[dependencies]
+# Web framework — the hub proxy-passes to us after stripping /p/pfsense.
+axum = { version = "0.8", features = ["ws", "multipart"] }
+
+# Async runtime — tokio features matched to what this binary actually calls:
+# rt-multi-thread for the server, macros for #[tokio::main], time for the
+# bandwidth sampler tick, process is unused here but kept to match the
+# workspace pin in case a caller inspects the feature set.
+tokio = { version = "1", features = [
+    "rt-multi-thread",
+    "macros",
+    "time",
+    "process",
+    "sync",
+    "fs",
+    "net",
+    "io-util",
+] }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# SSH — same versions as the Leo workspace; russh-keys is re-exported through
+# russh in 0.46 but listed separately in case the API surface differs.
+russh = "0.46"
+russh-keys = "0.46"
+
+# Input validation
+regex = "1"
+
+# Home-dir expansion for the key path
+dirs = "6"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Date/time for VPN uptime formatting
+chrono = { version = "0.4", features = ["serde"] }
+
+# Async trait — needed for the russh client::Handler impl
+async-trait = "0.1"
+
+# Error handling
+anyhow = "1"
