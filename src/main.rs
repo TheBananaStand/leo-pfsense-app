@@ -26,6 +26,27 @@ pub struct AppState {
     pub monitor: Arc<bandwidth::BandwidthMonitor>,
 }
 
+/// The whole HTTP surface, assembled.
+///
+/// Its own function so a test can build it. axum decides a good deal of routing
+/// legality at *runtime* — a root `nest` panics on construction, and compiles
+/// perfectly on the way there — so "does this router assemble" is a real
+/// question that only running the code answers.
+pub fn build_router(state: AppState) -> Router {
+    // `merge`, not `nest("/", …)`: axum 0.8 panics on a root nest, which is a
+    // runtime failure from code that type-checks. The two differ only at the
+    // root — merge folds the routes in as though declared here, which is what
+    // mounting at `/` always meant.
+    Router::new()
+        .merge(routes::router())
+        .route(
+            "/leo/ui/descriptor",
+            axum::routing::get(ui::descriptor_handler),
+        )
+        .route("/leo/ui/data", axum::routing::get(ui::data_handler))
+        .with_state(state)
+}
+
 #[tokio::main]
 async fn main() {
     // Respect RUST_LOG; default to info so the operator can see SSH activity
@@ -57,14 +78,8 @@ async fn main() {
         monitor,
     };
 
-    // The hub strips /p/pfsense before forwarding, so we mount everything at /.
-    // The /leo/* prefix is Leo's convention for internal app-package endpoints
-    // (descriptor and data); the rest mirrors the hub's /api/network/* surface.
-    let app = Router::new()
-        .nest("/", routes::router())
-        .route("/leo/ui/descriptor", axum::routing::get(ui::descriptor_handler))
-        .route("/leo/ui/data", axum::routing::get(ui::data_handler))
-        .with_state(state);
+    // The hub strips /p/pfsense before forwarding, so everything mounts at /.
+    let app = build_router(state);
 
     let addr = format!("127.0.0.1:{}", cfg.listen_port);
     info!("leo-pfsense-app listening on {addr}");
@@ -80,4 +95,29 @@ async fn main() {
         eprintln!("Server error: {e}");
         std::process::exit(1);
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The router assembles.
+    ///
+    /// This exists because it already failed once in the way that costs most:
+    /// `nest("/", …)` compiled, installed, cloned, built, launched — and
+    /// panicked on the first line of `main`, so the package was rejected after
+    /// a full cold build on the hub. A compile check cannot see it; only
+    /// building the router can.
+    #[test]
+    fn the_router_assembles() {
+        let state = AppState {
+            pfsense: std::sync::Arc::new(pfsense::PfSenseService::new(
+                "192.0.2.1", 22, "admin", None, None,
+            )),
+            monitor: std::sync::Arc::new(bandwidth::BandwidthMonitor::new()),
+        };
+        // Construction is the assertion — a bad route shape panics here, and no
+        // request is ever made, so the unroutable address is never dialled.
+        let _ = build_router(state);
+    }
 }
