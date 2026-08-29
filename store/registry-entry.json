@@ -1,0 +1,32 @@
+{
+  "name": "pfsense-app",
+  "label": "Network",
+  "description": "pfSense router management — devices, DHCP reservations, DNS overrides, VPN and HAProxy.",
+  "icon": "wifi",
+  "version": "1.0.0",
+  "author": "TheBananaStand",
+  "homepage": "https://github.com/TheBananaStand/leo-pfsense-app",
+  "category": "package",
+  "descriptor": {
+    "kind": "app",
+    "app": {
+      "repo": "https://github.com/TheBananaStand/leo-pfsense-app",
+      "rev": "c65470fb5ccec020f2b4fe7e483ad57bf3b87ca5",
+      "bin": "target/release/leo-pfsense-app",
+      "port": 0
+    },
+    "entitlements": {
+      "settings_read": [
+        "pfsense_host", "pfsense_port", "pfsense_username",
+        "pfsense_password", "pfsense_key"
+      ],
+      "sends": [
+        {
+          "to": "the pfSense box on your LAN",
+          "classes": ["credentials"],
+          "purpose": "The SSH credentials you configured, to the router you configured them for. Everything it reads — leases, reservations, DNS overrides, VPN state — comes back from that box and goes nowhere else."
+        }
+      ]
+    }
+  }
+}
