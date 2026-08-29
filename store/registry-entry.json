@@ -11,7 +11,7 @@
     "kind": "app",
     "app": {
       "repo": "https://github.com/TheBananaStand/leo-pfsense-app",
-      "rev": "a457c925dc78b4ad746814d9676d1586684fa4d9",
+      "rev": "1c808688e2fdf86e063194572055eb81c3a6cfb0",
       "bin": "target/release/leo-pfsense-app",
       "port": 0
     },
