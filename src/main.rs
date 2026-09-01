@@ -28,6 +28,9 @@ mod routes;
 mod sampler;
 mod ui;
 
+#[cfg(test)]
+mod admin_gate_test;
+
 /// Shared state threaded through every axum handler.
 #[derive(Clone)]
 pub struct AppState {
@@ -151,4 +154,19 @@ mod tests {
         // request is ever made, so the unroutable address is never dialled.
         let _ = build_router(state);
     }
+}
+
+/// A non-admin account can't repoint the network Leo serves DNS for through
+/// `/dhcp/static` or `/dns/overrides` — the check that lived in `leo-api` as
+/// `network_admin_test` before pfSense and Network became this out-of-process
+/// app (`d1c4480096`), which deleted the test along with the routes.
+///
+/// Crate root on purpose — Leo's Autopilot verifier runs `cargo test
+/// dns_and_dhcp_writes_require_admin -- --exact`, and `--exact` matches the
+/// full test path. The body is in
+/// [`admin_gate_test::run`](admin_gate_test::run).
+#[cfg(test)]
+#[tokio::test]
+async fn dns_and_dhcp_writes_require_admin() {
+    admin_gate_test::run().await;
 }

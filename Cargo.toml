@@ -47,3 +47,9 @@ async-trait = "0.1"
 
 # Error handling
 anyhow = "1"
+
+[dev-dependencies]
+# Drives the real router in-process for the admin-gate test — same technique
+# the deleted leo-api test used (`Router::oneshot`).
+tower = { version = "0.5", features = ["util"] }
+http-body-util = "0.1"
